@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-transformer-scaling"
+version = "0.1.0"
+description = "Reproducible character-level decoder-only Transformer scaling experiment"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = ["torch>=2.2", "PyYAML>=6.0", "matplotlib>=3.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+mini-transformer-train = "mini_transformer.train:main"
+mini-transformer-evaluate = "mini_transformer.evaluate:main"
+mini-transformer-generate = "mini_transformer.generate:main"
+mini-transformer-experiment = "mini_transformer.experiment:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,0 +1,19 @@
+models:
+  tiny:
+    d_model: 64
+    n_layers: 2
+    n_heads: 2
+    d_ff: 256
+  small:
+    d_model: 128
+    n_layers: 4
+    n_heads: 4
+    d_ff: 512
+  medium:
+    d_model: 256
+    n_layers: 6
+    n_heads: 8
+    d_ff: 1024
+defaults:
+  dropout: 0.1
+  tie_weights: true

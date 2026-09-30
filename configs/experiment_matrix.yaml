@@ -1,0 +1,5 @@
+model_sizes: [tiny, small, medium]
+data_fractions: [0.1, 0.3, 1.0]
+seed: 42
+continue_on_error: true
+output_root: outputs
