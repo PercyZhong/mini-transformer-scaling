@@ -1,7 +1,3 @@
-import pytest
-
-pytest.importorskip("torch")
-
 from mini_transformer.data import nested_window_subsets, split_text
 
 

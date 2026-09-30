@@ -1,10 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
-pytest.importorskip("torch")
-
 from mini_transformer.config import TrainingConfig
 from mini_transformer.train import run_training
 

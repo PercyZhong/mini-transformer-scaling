@@ -6,7 +6,7 @@ import json
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +47,7 @@ def main() -> None:
     manifest = {
         "source_url": DATASET_URL,
         "downloaded_this_run": downloaded,
-        "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
+        "recorded_at_utc": datetime.now(UTC).isoformat(),
         "path": str(raw_path.relative_to(PROJECT_ROOT)),
         "bytes": raw_path.stat().st_size,
         "sha256": sha256_file(raw_path),

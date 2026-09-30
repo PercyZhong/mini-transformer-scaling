@@ -1,8 +1,6 @@
 from pathlib import Path
 
-import pytest
-
-torch = pytest.importorskip("torch")
+import torch
 
 from mini_transformer.config import ModelConfig
 from mini_transformer.data import InfiniteBatchIterator, WindowDataset

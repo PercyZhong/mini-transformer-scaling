@@ -1,6 +1,4 @@
-import pytest
-
-torch = pytest.importorskip("torch")
+import torch
 
 from mini_transformer.config import ModelConfig
 from mini_transformer.model import MiniTransformerLM
