@@ -5,14 +5,14 @@ import torch
 from mini_transformer.config import ModelConfig
 from mini_transformer.data import InfiniteBatchIterator, WindowDataset
 from mini_transformer.model import MiniTransformerLM
-from mini_transformer.train import load_checkpoint, save_checkpoint
+from mini_transformer.train import create_grad_scaler, load_checkpoint, save_checkpoint
 
 
 def test_checkpoint_restores_step_parameters_and_optimizer(tmp_path: Path) -> None:
     config = ModelConfig(vocab_size=11, context_length=4, d_model=8, n_layers=1, n_heads=2, d_ff=16)
     model = MiniTransformerLM(config)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = create_grad_scaler(enabled=False)
     batches = InfiniteBatchIterator(WindowDataset(list(range(11)) * 4, 4), 2, 42)
     inputs, targets = next(batches)
     _, loss = model(inputs, targets)

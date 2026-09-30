@@ -37,11 +37,19 @@ def learning_rate(step: int, config: TrainingConfig) -> float:
     )
 
 
+def create_grad_scaler(enabled: bool) -> Any:
+    """Create a CUDA scaler using the current API with a PyTorch 2.2 fallback."""
+    scaler_type = getattr(torch.amp, "GradScaler", None)
+    if scaler_type is not None:
+        return scaler_type("cuda", enabled=enabled)
+    return torch.cuda.amp.GradScaler(enabled=enabled)
+
+
 def save_checkpoint(
     path: Path,
     model: MiniTransformerLM,
     optimizer: torch.optim.Optimizer,
-    scaler: torch.cuda.amp.GradScaler,
+    scaler: Any,
     train_batches: InfiniteBatchIterator,
     step: int,
     best_val_loss: float,
@@ -73,7 +81,7 @@ def load_checkpoint(
     path: Path,
     model: MiniTransformerLM,
     optimizer: torch.optim.Optimizer,
-    scaler: torch.cuda.amp.GradScaler,
+    scaler: Any,
     train_batches: InfiniteBatchIterator,
     device: torch.device,
 ) -> tuple[int, float]:
@@ -153,7 +161,7 @@ def run_training(
         model.parameters(), lr=training.learning_rate, weight_decay=training.weight_decay
     )
     amp_enabled = device.type == "cuda" and training.mixed_precision
-    scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
+    scaler = create_grad_scaler(amp_enabled)
     train_batches = InfiniteBatchIterator(
         prepared.datasets["train"], training.batch_size, training.seed
     )
