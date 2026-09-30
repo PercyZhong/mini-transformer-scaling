@@ -26,13 +26,24 @@ FIELDS = [
 ]
 
 
+def formal_run_directories(output_root: Path) -> list[Path]:
+    matrix_manifest = output_root / "matrix_manifest.json"
+    if matrix_manifest.exists():
+        matrix = json.loads(matrix_manifest.read_text(encoding="utf-8"))
+        return [output_root / str(run["run_id"]) for run in matrix.get("runs", [])]
+    return sorted(
+        path
+        for path in output_root.iterdir()
+        if path.is_dir()
+        and path.name != "summary"
+        and not path.name.startswith("smoke-")
+    )
+
+
 def load_runs(output_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     completed: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
-    run_dirs = (
-        path for path in output_root.iterdir() if path.is_dir() and path.name != "summary"
-    )
-    for run_dir in sorted(run_dirs):
+    for run_dir in formal_run_directories(output_root):
         status_path = run_dir / "status.json"
         summary_path = run_dir / "summary.json"
         if summary_path.exists():
