@@ -1,0 +1,25 @@
+{
+  "archive": "results_packages/stage1-closure-359a820.zip",
+  "archive_size_bytes": 413929789,
+  "archive_sha256": "baee5aa2605c2957df94cef47a766d0446684d1a74ec98ff3bb31ce8918644a1",
+  "archive_sha256_sidecar": "results_packages/stage1-closure-359a820.zip.sha256",
+  "checkpoint_files_archived": {
+    "best": 9,
+    "final": 9
+  },
+  "closure_implementation_commit": "359a820e282a0f7af4c270e10488d2980bab5ff8",
+  "experiment_commit": "bd74aa17ffad8d2db7d0aa9214199a83f2c401cc",
+  "github_url": "https://github.com/PercyZhong/mini-transformer-scaling.git",
+  "manifest_files_verified_after_extraction": 135,
+  "retraining_triggered": false,
+  "verification": {
+    "checkpoint_sha256": "18/18 passed",
+    "independent_best_reload_and_generation": "9/9 passed",
+    "independent_reload_from_extracted_zip": "passed",
+    "pytest": "15 passed",
+    "ruff": "passed",
+    "unzip_crc": "passed",
+    "zip_sha256": "passed"
+  },
+  "zip_extraction_directory": "results_packages/verify-stage1-closure-359a820"
+}

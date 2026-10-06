@@ -1,0 +1,110 @@
+[
+  {
+    "checkpoint": "outputs/tiny-010pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "tiny-010pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/tiny-030pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "tiny-030pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/tiny-100pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "tiny-100pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/small-010pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "small-010pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/small-030pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "small-030pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/small-100pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "small-100pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/medium-010pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "medium-010pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/medium-030pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "medium-030pct-seed42",
+    "strict_load": true
+  },
+  {
+    "checkpoint": "outputs/medium-100pct-seed42/checkpoints/best.pt",
+    "error": null,
+    "generated_characters": 100,
+    "generation_ok": true,
+    "independent_process": true,
+    "loadable": true,
+    "process_returncode": 0,
+    "prompt": "ROMEO:",
+    "run_id": "medium-100pct-seed42",
+    "strict_load": true
+  }
+]
