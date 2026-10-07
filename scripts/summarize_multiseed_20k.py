@@ -288,7 +288,7 @@ def plot_all(
                     if row["model_size"] == model and float(row["data_fraction"]) == fraction
                 ]
             )
-    plt.boxplot(distributions, labels=labels)
+    plt.boxplot(distributions, tick_labels=labels)
     plt.title("Best evaluation step across seeds")
     plt.xlabel("Condition")
     plt.ylabel("Best step (evaluation resolution: 2,000)")
