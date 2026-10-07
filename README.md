@@ -63,3 +63,14 @@ python -m pytest -q
 Generated datasets, environments, caches, outputs, result packages, checkpoints, and secrets
 are excluded from Git. See [Linux runbook](docs/LINUX_RUNBOOK.md) and
 [experiment protocol](docs/EXPERIMENT_PROTOCOL.md).
+
+## Stage 1 multi-seed 20k extension
+
+The isolated extension uses three seeds and 20,000 optimizer steps without modifying the
+closed Stage 1 outputs. Its formal configuration is
+`configs/experiment_multiseed_20k.yaml`; the scheduler binds seeds 42/43/44 to physical GPUs
+0/1/2 and refuses to use GPU 3. New outputs are written only to `outputs_multiseed_20k/`.
+
+Follow [the extension runbook](docs/STAGE1_MULTISEED_20K_RUNBOOK.md) for the Linux dry-run,
+tests, three-GPU smoke test, formal launch, safe resume, analysis, independent checkpoint
+validation, and packaging commands.

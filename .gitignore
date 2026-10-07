@@ -10,6 +10,8 @@ htmlcov/
 data/raw/
 data/processed/
 outputs/
+outputs_multiseed_20k/
+outputs_multiseed_20k_smoke/
 results_packages/
 *.pt
 *.pth

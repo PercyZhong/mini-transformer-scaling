@@ -14,6 +14,7 @@ def test_checkpoint_restores_step_parameters_and_optimizer(tmp_path: Path) -> No
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     scaler = create_grad_scaler(enabled=False)
     batches = InfiniteBatchIterator(WindowDataset(list(range(11)) * 4, 4), 2, 42)
+    val_batches = InfiniteBatchIterator(WindowDataset(list(range(11)) * 4, 4), 2, 43)
     inputs, targets = next(batches)
     _, loss = model(inputs, targets)
     assert loss is not None
@@ -21,15 +22,32 @@ def test_checkpoint_restores_step_parameters_and_optimizer(tmp_path: Path) -> No
     optimizer.step()
     expected = {key: value.detach().clone() for key, value in model.state_dict().items()}
     path = tmp_path / "latest.pt"
-    save_checkpoint(path, model, optimizer, scaler, batches, 7, 2.5, 0.1, ["<unk>"])
+    next(val_batches)
+    expected_val_state = val_batches.state_dict()["generator_state"].clone()
+    save_checkpoint(
+        path,
+        model,
+        optimizer,
+        scaler,
+        batches,
+        7,
+        2.5,
+        0.1,
+        ["<unk>"],
+        val_batches,
+    )
+    next(val_batches)
     with torch.no_grad():
         for parameter in model.parameters():
             parameter.zero_()
     restored_step, restored_best = load_checkpoint(
-        path, model, optimizer, scaler, batches, torch.device("cpu")
+        path, model, optimizer, scaler, batches, torch.device("cpu"), val_batches
     )
     assert restored_step == 7
     assert restored_best == 2.5
     for key, value in model.state_dict().items():
         torch.testing.assert_close(value, expected[key])
     assert optimizer.state_dict()["state"]
+    torch.testing.assert_close(
+        val_batches.state_dict()["generator_state"], expected_val_state
+    )

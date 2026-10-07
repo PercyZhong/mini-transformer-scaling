@@ -55,6 +55,7 @@ def save_checkpoint(
     best_val_loss: float,
     data_fraction: float,
     vocabulary: list[str],
+    val_batches: InfiniteBatchIterator | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -67,6 +68,9 @@ def save_checkpoint(
             "optimizer_state": optimizer.state_dict(),
             "scaler_state": scaler.state_dict(),
             "batch_iterator_state": train_batches.state_dict(),
+            "val_batch_iterator_state": (
+                val_batches.state_dict() if val_batches is not None else None
+            ),
             "rng_state": torch.get_rng_state(),
             "cuda_rng_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
             "data_fraction": data_fraction,
@@ -84,12 +88,15 @@ def load_checkpoint(
     scaler: Any,
     train_batches: InfiniteBatchIterator,
     device: torch.device,
+    val_batches: InfiniteBatchIterator | None = None,
 ) -> tuple[int, float]:
     checkpoint = torch.load(path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state"])
     optimizer.load_state_dict(checkpoint["optimizer_state"])
     scaler.load_state_dict(checkpoint.get("scaler_state", {}))
     train_batches.load_state_dict(checkpoint["batch_iterator_state"])
+    if val_batches is not None and checkpoint.get("val_batch_iterator_state") is not None:
+        val_batches.load_state_dict(checkpoint["val_batch_iterator_state"])
     torch.set_rng_state(checkpoint["rng_state"].cpu())
     if torch.cuda.is_available() and checkpoint.get("cuda_rng_state") is not None:
         torch.cuda.set_rng_state_all(checkpoint["cuda_rng_state"])
@@ -99,6 +106,26 @@ def load_checkpoint(
 def _append_metric(path: Path, metric: dict[str, Any]) -> None:
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(metric, sort_keys=True) + "\n")
+
+
+def _prepare_metrics_for_resume(
+    path: Path, completed_step: int
+) -> tuple[float, float, float]:
+    if not path.exists():
+        return 0.0, float("nan"), float("nan")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    retained = [row for row in rows if int(row["step"]) <= completed_step]
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        for row in retained:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    if not retained:
+        return 0.0, float("nan"), float("nan")
+    last = retained[-1]
+    return (
+        max(float(row.get("elapsed_seconds", 0.0)) for row in retained),
+        float(last["train_loss"]),
+        float(last["val_loss"]),
+    )
 
 
 def run_training(
@@ -141,10 +168,15 @@ def run_training(
     previous_hash = existing_status.get("config_hash")
     if previous_hash is not None and previous_hash != config_hash:
         raise RuntimeError("run directory contains artifacts for a different config hash")
+    if not resume and (status_path.exists() or metrics_path.exists()):
+        raise FileExistsError("refusing a fresh run in a directory containing run artifacts")
     if existing_status.get("state") == "completed":
         return json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
     write_yaml(output_dir / "config.resolved.yaml", resolved)
-    atomic_json(output_dir / "environment.json", collect_environment(root))
+    atomic_json(
+        output_dir / "environment.json",
+        collect_environment(root, training.physical_gpu_id),
+    )
     dataset_manifest = dict(prepared.manifest)
     download_manifest_path = root / "data/processed/dataset_manifest.json"
     if download_manifest_path.exists():
@@ -172,9 +204,12 @@ def run_training(
     latest_path = checkpoint_dir / "latest.pt"
     if resume and latest_path.exists():
         start_step, best_val_loss = load_checkpoint(
-            latest_path, model, optimizer, scaler, train_batches, device
+            latest_path, model, optimizer, scaler, train_batches, device, val_batches
         )
         best_step = int(existing_status.get("best_step", 0))
+    prior_elapsed, final_train_loss, final_val_loss = _prepare_metrics_for_resume(
+        metrics_path, start_step
+    )
     start_time = time.perf_counter()
     tokens_processed = (
         start_step
@@ -182,13 +217,13 @@ def run_training(
         * training.context_length
         * training.gradient_accumulation_steps
     )
-    final_train_loss = float("nan")
-    final_val_loss = float("nan")
+    current_step = start_step
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
     try:
         model.train()
         for step in range(start_step + 1, training.max_steps + 1):
+            current_step = step
             optimizer.zero_grad(set_to_none=True)
             accumulated_loss = 0.0
             for _ in range(training.gradient_accumulation_steps):
@@ -220,18 +255,25 @@ def run_training(
                 * training.gradient_accumulation_steps
             )
             evaluate_now = (
-                step == 1 or step % training.eval_interval == 0 or step == training.max_steps
+                (training.evaluate_at_step_one and step == 1)
+                or step % training.eval_interval == 0
+                or step == training.max_steps
             )
             if evaluate_now:
                 final_val_loss = evaluate_loss(model, val_batches, device, training.eval_batches)
                 metric = {
+                    "run_id": output_dir.name,
+                    "model_size": model_size,
+                    "data_fraction": data_fraction,
+                    "seed": training.seed,
                     "step": step,
                     "train_loss": final_train_loss,
                     "val_loss": final_val_loss,
                     "val_perplexity": math.exp(final_val_loss),
                     "learning_rate": rate,
                     "tokens_processed": tokens_processed,
-                    "elapsed_seconds": time.perf_counter() - start_time,
+                    "elapsed_seconds": prior_elapsed + time.perf_counter() - start_time,
+                    "physical_gpu_id": training.physical_gpu_id,
                 }
                 _append_metric(metrics_path, metric)
                 if final_val_loss < best_val_loss:
@@ -239,11 +281,13 @@ def run_training(
                     save_checkpoint(
                         checkpoint_dir / "best.pt", model, optimizer, scaler, train_batches,
                         step, best_val_loss, data_fraction, prepared.vocabulary.itos,
+                        val_batches,
                     )
             if step % training.checkpoint_interval == 0 or step == training.max_steps:
                 save_checkpoint(
                     latest_path, model, optimizer, scaler, train_batches, step,
                     best_val_loss, data_fraction, prepared.vocabulary.itos,
+                    val_batches,
                 )
                 atomic_json(
                     status_path,
@@ -257,18 +301,20 @@ def run_training(
         save_checkpoint(
             checkpoint_dir / "final.pt", model, optimizer, scaler, train_batches,
             training.max_steps, best_val_loss, data_fraction, prepared.vocabulary.itos,
+            val_batches,
         )
-        elapsed = time.perf_counter() - start_time
+        elapsed = prior_elapsed + time.perf_counter() - start_time
         sample = generate_text(
             model, prepared.vocabulary, training.fixed_prompt, device, max_new_tokens=100
         )
         (output_dir / "samples.txt").write_text(sample + "\n", encoding="utf-8", newline="\n")
-        environment = collect_environment(root)
+        environment = collect_environment(root, training.physical_gpu_id)
         summary = {
             "run_id": output_dir.name,
             "model_size": model_size,
             "data_fraction": data_fraction,
             "seed": training.seed,
+            "physical_gpu_id": training.physical_gpu_id,
             "parameter_count": model.count_parameters(),
             "unique_train_windows": len(prepared.datasets["train"]),
             "tokens_processed": tokens_processed,
@@ -309,6 +355,8 @@ def run_training(
                 "failed_at_utc": utc_now(),
                 "error_type": type(error).__name__,
                 "error": str(error),
+                "step": current_step,
+                "best_step": best_step,
                 "config_hash": config_hash,
             },
         )
@@ -332,6 +380,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gradient-accumulation-steps", type=int)
     parser.add_argument("--checkpoint-interval", type=int)
     parser.add_argument("--device")
+    parser.add_argument("--physical-gpu-id", type=int)
+    parser.add_argument("--no-step-one-eval", action="store_true")
     parser.add_argument("--no-mixed-precision", action="store_true")
     parser.add_argument("--no-resume", action="store_true")
     return parser
@@ -351,6 +401,8 @@ def main() -> None:
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "checkpoint_interval": args.checkpoint_interval,
         "device": args.device,
+        "physical_gpu_id": args.physical_gpu_id,
+        "evaluate_at_step_one": False if args.no_step_one_eval else None,
         "mixed_precision": False if args.no_mixed_precision else None,
     }
     training = load_training_config(args.training_config, overrides)

@@ -48,6 +48,8 @@ class TrainingConfig:
     num_workers: int = 0
     checkpoint_interval: int = 100
     fixed_prompt: str = "ROMEO:"
+    physical_gpu_id: int | None = None
+    evaluate_at_step_one: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

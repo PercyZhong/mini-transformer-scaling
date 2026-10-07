@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 import yaml
 
@@ -21,6 +22,7 @@ def utc_now() -> str:
 
 def seed_everything(seed: int) -> None:
     random.seed(seed)
+    np.random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -61,7 +63,19 @@ def git_commit(root: Path) -> str:
         return "unknown"
 
 
-def collect_environment(root: Path) -> dict[str, Any]:
+def _nvidia_driver_version() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        ).splitlines()[0].strip()
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
+        return None
+
+
+def collect_environment(root: Path, physical_gpu_id: int | None = None) -> dict[str, Any]:
     cuda = torch.cuda.is_available()
     return {
         "captured_at_utc": utc_now(),
@@ -71,6 +85,13 @@ def collect_environment(root: Path) -> dict[str, Any]:
         "cuda_available": cuda,
         "cuda_version": torch.version.cuda,
         "gpu": torch.cuda.get_device_name(0) if cuda else None,
+        "physical_gpu_id": physical_gpu_id,
+        "logical_gpu_id": 0 if cuda else None,
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        "nvidia_driver": _nvidia_driver_version() if cuda else None,
+        "cudnn_deterministic": torch.backends.cudnn.deterministic,
+        "cudnn_benchmark": torch.backends.cudnn.benchmark,
+        "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
         "git_commit": git_commit(root),
     }
 
