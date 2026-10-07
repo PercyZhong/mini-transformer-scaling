@@ -31,9 +31,16 @@ def test_smoke_training_produces_minimum_artifacts(tmp_path: Path) -> None:
         training=config,
     )
     expected = [
-        "config.resolved.yaml", "environment.json", "dataset_manifest.json",
-        "metrics.jsonl", "summary.json", "samples.txt", "status.json",
-        "checkpoints/best.pt", "checkpoints/latest.pt", "checkpoints/final.pt",
+        "config.resolved.yaml",
+        "environment.json",
+        "dataset_manifest.json",
+        "metrics.jsonl",
+        "summary.json",
+        "samples.txt",
+        "status.json",
+        "checkpoints/best.pt",
+        "checkpoints/latest.pt",
+        "checkpoints/final.pt",
     ]
     assert all((output / item).exists() for item in expected)
     assert summary["status"] == "completed"
@@ -67,7 +74,10 @@ def test_formal_style_smoke_logs_required_metadata(tmp_path: Path) -> None:
         data_fraction=0.1,
         training=config,
     )
-    rows = [json.loads(line) for line in (output / "metrics.jsonl").read_text(encoding="utf-8").splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (output / "metrics.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     assert rows[-1]["run_id"] == output.name
     assert rows[-1]["model_size"] == "tiny"
     assert rows[-1]["data_fraction"] == 0.1

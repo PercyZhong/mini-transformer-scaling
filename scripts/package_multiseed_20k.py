@@ -20,13 +20,20 @@ from mini_transformer.multiseed import expand_runs, load_experiment_config  # no
 from mini_transformer.utils import sha256_file  # noqa: E402
 
 RUN_FILES = (
-    "config.resolved.yaml", "environment.json", "dataset_manifest.json", "metrics.jsonl",
-    "samples.txt", "status.json", "summary.json",
+    "config.resolved.yaml",
+    "environment.json",
+    "dataset_manifest.json",
+    "metrics.jsonl",
+    "samples.txt",
+    "status.json",
+    "summary.json",
 )
 
 
 def git_short(root: Path) -> str:
-    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=root, text=True).strip()
+    return subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"], cwd=root, text=True
+    ).strip()
 
 
 def archive_files(root: Path, output_root: Path, config: Path, full: bool) -> list[Path]:
@@ -44,7 +51,12 @@ def archive_files(root: Path, output_root: Path, config: Path, full: bool) -> li
             files.extend(run_dir / "checkpoints" / f"{kind}.pt" for kind in ("best", "final"))
     files.extend(path for path in (output_root / "summary").iterdir() if path.is_file())
     files.extend(path for path in (output_root / "scheduler_logs").iterdir() if path.is_file())
-    files.extend([output_root / "scheduler_manifest.json", output_root / "original_stage1_manifest.before.json"])
+    files.extend(
+        [
+            output_root / "scheduler_manifest.json",
+            output_root / "original_stage1_manifest.before.json",
+        ]
+    )
     unique = sorted(set(files), key=lambda path: path.relative_to(root).as_posix())
     missing = [path.relative_to(root).as_posix() for path in unique if not path.is_file()]
     if missing:
@@ -52,16 +64,27 @@ def archive_files(root: Path, output_root: Path, config: Path, full: bool) -> li
     return unique
 
 
-def create_one(root: Path, output_root: Path, config: Path, package_dir: Path, full: bool) -> dict[str, Any]:
+def create_one(
+    root: Path, output_root: Path, config: Path, package_dir: Path, full: bool
+) -> dict[str, Any]:
     kind = "full" if full else "analysis"
     files = archive_files(root, output_root, config, full)
     manifest = {
         "kind": kind,
         "checkpoint_bodies_included": full,
-        "files": [{"path": path.relative_to(root).as_posix(), "size_bytes": path.stat().st_size, "sha256": sha256_file(path)} for path in files],
+        "files": [
+            {
+                "path": path.relative_to(root).as_posix(),
+                "size_bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+            for path in files
+        ],
     }
     manifest_path = output_root / "summary" / f"{kind}_archive_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
     files.append(manifest_path)
     archive = package_dir / f"stage1-multiseed-20k-{kind}-{git_short(root)}.zip"
     if archive.exists():
@@ -69,11 +92,19 @@ def create_one(root: Path, output_root: Path, config: Path, package_dir: Path, f
     with zipfile.ZipFile(archive, "w", allowZip64=True) as handle:
         for path in files:
             compression = zipfile.ZIP_STORED if path.suffix == ".pt" else zipfile.ZIP_DEFLATED
-            handle.write(path, path.relative_to(root).as_posix(), compress_type=compression, compresslevel=6)
+            handle.write(
+                path, path.relative_to(root).as_posix(), compress_type=compression, compresslevel=6
+            )
     digest = sha256_file(archive)
     sidecar = archive.with_suffix(".zip.sha256")
     sidecar.write_text(f"{digest}  {archive.name}\n", encoding="utf-8", newline="\n")
-    return {"kind": kind, "archive": str(archive), "size_bytes": archive.stat().st_size, "sha256": digest, "sidecar": str(sidecar)}
+    return {
+        "kind": kind,
+        "archive": str(archive),
+        "size_bytes": archive.stat().st_size,
+        "sha256": digest,
+        "sidecar": str(sidecar),
+    }
 
 
 def safe_names(names: list[str]) -> None:
@@ -99,11 +130,17 @@ def verify_archive(archive: Path, extract_dir: Path) -> dict[str, Any]:
         extract_dir.mkdir(parents=True)
         handle.extractall(extract_dir)
     kind = "full" if "-full-" in archive.name else "analysis"
-    manifest_path = extract_dir / "outputs_multiseed_20k" / "summary" / f"{kind}_archive_manifest.json"
+    manifest_path = (
+        extract_dir / "outputs_multiseed_20k" / "summary" / f"{kind}_archive_manifest.json"
+    )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for entry in manifest["files"]:
         path = extract_dir / entry["path"]
-        if not path.is_file() or path.stat().st_size != entry["size_bytes"] or sha256_file(path) != entry["sha256"]:
+        if (
+            not path.is_file()
+            or path.stat().st_size != entry["size_bytes"]
+            or sha256_file(path) != entry["sha256"]
+        ):
             raise ValueError(f"extracted file verification failed: {entry['path']}")
     archived_paths = {entry["path"] for entry in manifest["files"]}
     if kind == "analysis" and any(path.endswith(".pt") for path in archived_paths):
@@ -137,13 +174,31 @@ def verify_archive(archive: Path, extract_dir: Path) -> dict[str, Any]:
     if kind == "full":
         for run in runs:
             for checkpoint_type in ("best", "final"):
-                checkpoint = extract_dir / "outputs_multiseed_20k" / run.run_id / "checkpoints" / f"{checkpoint_type}.pt"
-                command = [sys.executable, str(extract_dir / "scripts/validate_multiseed_20k.py"), "verify-one", str(checkpoint)]
+                checkpoint = (
+                    extract_dir
+                    / "outputs_multiseed_20k"
+                    / run.run_id
+                    / "checkpoints"
+                    / f"{checkpoint_type}.pt"
+                )
+                command = [
+                    sys.executable,
+                    str(extract_dir / "scripts/validate_multiseed_20k.py"),
+                    "verify-one",
+                    str(checkpoint),
+                ]
                 if checkpoint_type == "best":
                     command.append("--generate")
                 environment = dict(os.environ)
                 environment["PYTHONPATH"] = str(extract_dir / "src")
-                subprocess.run(command, cwd=extract_dir, env=environment, check=True, capture_output=True, text=True)
+                subprocess.run(
+                    command,
+                    cwd=extract_dir,
+                    env=environment,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
                 strict_loads += 1
                 generation_tests += checkpoint_type == "best"
     return {
@@ -162,7 +217,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     create = subparsers.add_parser("create")
-    create.add_argument("--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml"))
+    create.add_argument(
+        "--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml")
+    )
     create.add_argument("--output-root", type=Path, default=Path("outputs_multiseed_20k"))
     create.add_argument("--package-dir", type=Path, default=Path("results_packages"))
     verify = subparsers.add_parser("verify")
@@ -173,11 +230,16 @@ def main() -> None:
         args.config = args.config.resolve()
         args.output_root = args.output_root.resolve()
         args.package_dir = args.package_dir.resolve()
-        validation = json.loads((args.output_root / "summary/validation_report.json").read_text(encoding="utf-8"))
+        validation = json.loads(
+            (args.output_root / "summary/validation_report.json").read_text(encoding="utf-8")
+        )
         if not validation.get("passed"):
             raise RuntimeError("automatic validation must pass before packaging")
         args.package_dir.mkdir(parents=True, exist_ok=True)
-        result = [create_one(PROJECT_ROOT, args.output_root, args.config, args.package_dir, full) for full in (False, True)]
+        result = [
+            create_one(PROJECT_ROOT, args.output_root, args.config, args.package_dir, full)
+            for full in (False, True)
+        ]
     else:
         result = verify_archive(args.archive.resolve(), args.extract_dir.resolve())
     print(json.dumps(result, indent=2))

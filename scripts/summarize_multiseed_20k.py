@@ -10,8 +10,9 @@ import math
 import statistics
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import matplotlib
 import numpy as np
@@ -30,15 +31,36 @@ from mini_transformer.multiseed import (  # noqa: E402
 
 T_CRITICAL_DF2 = 4.303
 SUMMARY_FIELDS = (
-    "run_id", "model_size", "data_fraction", "seed", "physical_gpu_id",
-    "parameter_count", "unique_train_windows", "tokens_processed", "best_step",
-    "best_val_loss", "final_train_loss", "final_val_loss", "final_val_perplexity",
-    "training_seconds", "tokens_per_second", "peak_gpu_memory_mb", "best_checkpoint",
-    "final_checkpoint", "status", "git_commit", "config_hash", "dataset_hash",
+    "run_id",
+    "model_size",
+    "data_fraction",
+    "seed",
+    "physical_gpu_id",
+    "parameter_count",
+    "unique_train_windows",
+    "tokens_processed",
+    "best_step",
+    "best_val_loss",
+    "final_train_loss",
+    "final_val_loss",
+    "final_val_perplexity",
+    "training_seconds",
+    "tokens_per_second",
+    "peak_gpu_memory_mb",
+    "best_checkpoint",
+    "final_checkpoint",
+    "status",
+    "git_commit",
+    "config_hash",
+    "dataset_hash",
 )
 STAT_METRICS = (
-    "best_val_loss", "final_val_loss", "final_val_perplexity", "training_seconds",
-    "tokens_per_second", "peak_gpu_memory_mb",
+    "best_val_loss",
+    "final_val_loss",
+    "final_val_perplexity",
+    "training_seconds",
+    "tokens_per_second",
+    "peak_gpu_memory_mb",
 )
 
 
@@ -61,7 +83,9 @@ def stats(values: Iterable[float]) -> tuple[float, float, float, float, float]:
     return mean, std, se, mean - margin, mean + margin
 
 
-def write_csv(path: Path, fieldnames: list[str] | tuple[str, ...], rows: list[dict[str, Any]]) -> None:
+def write_csv(
+    path: Path, fieldnames: list[str] | tuple[str, ...], rows: list[dict[str, Any]]
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -69,7 +93,9 @@ def write_csv(path: Path, fieldnames: list[str] | tuple[str, ...], rows: list[di
         writer.writerows(rows)
 
 
-def load_runs(config_path: Path, output_root: Path) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+def load_runs(
+    config_path: Path, output_root: Path
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     expected = expand_runs(load_experiment_config(config_path))
     summaries: list[dict[str, Any]] = []
     metrics: dict[str, list[dict[str, Any]]] = {}
@@ -101,29 +127,40 @@ def condition_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for metric in STAT_METRICS:
             mean, std, se, low, high = stats(row[metric] for row in rows)
-            output.update({
-                f"{metric}_mean": mean,
-                f"{metric}_sample_std": std,
-                f"{metric}_se": se,
-                f"{metric}_ci95_low": low,
-                f"{metric}_ci95_high": high,
-            })
+            output.update(
+                {
+                    f"{metric}_mean": mean,
+                    f"{metric}_sample_std": std,
+                    f"{metric}_se": se,
+                    f"{metric}_ci95_low": low,
+                    f"{metric}_ci95_high": high,
+                }
+            )
         result.append(output)
     return result
 
 
 def paired_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     lookup = {
-        (row["model_size"], float(row["data_fraction"]), int(row["seed"])): row
-        for row in summaries
+        (row["model_size"], float(row["data_fraction"]), int(row["seed"])): row for row in summaries
     }
     specs: list[tuple[str, str, str, list[tuple[str, float]], list[tuple[str, float]]]] = []
     for fraction in (0.1, 0.3, 1.0):
         for left, right in (("tiny", "small"), ("small", "medium"), ("tiny", "medium")):
-            specs.append(("model", f"{right}-{left}", f"data={fraction}", [(left, fraction)], [(right, fraction)]))
+            specs.append(
+                (
+                    "model",
+                    f"{right}-{left}",
+                    f"data={fraction}",
+                    [(left, fraction)],
+                    [(right, fraction)],
+                )
+            )
     for model in ("tiny", "small", "medium"):
         for left, right in ((0.1, 0.3), (0.3, 1.0), (0.1, 1.0)):
-            specs.append(("data", f"{right:g}-{left:g}", f"model={model}", [(model, left)], [(model, right)]))
+            specs.append(
+                ("data", f"{right:g}-{left:g}", f"model={model}", [(model, left)], [(model, right)])
+            )
     result = []
     for comparison_type, comparison, fixed_condition, left, right in specs:
         differences = {}
@@ -132,19 +169,21 @@ def paired_rows(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             right_row = lookup[(right[0][0], right[0][1], seed)]
             differences[seed] = float(right_row["best_val_loss"]) - float(left_row["best_val_loss"])
         mean, std, se, low, high = stats(differences.values())
-        result.append({
-            "metric": "best_val_loss",
-            "difference_direction": "right_minus_left_negative_is_improvement",
-            "comparison_type": comparison_type,
-            "comparison": comparison,
-            "fixed_condition": fixed_condition,
-            **{f"seed{seed}_difference": value for seed, value in differences.items()},
-            "mean_difference": mean,
-            "sample_std": std,
-            "standard_error": se,
-            "ci95_low": low,
-            "ci95_high": high,
-        })
+        result.append(
+            {
+                "metric": "best_val_loss",
+                "difference_direction": "right_minus_left_negative_is_improvement",
+                "comparison_type": comparison_type,
+                "comparison": comparison,
+                "fixed_condition": fixed_condition,
+                **{f"seed{seed}_difference": value for seed, value in differences.items()},
+                "mean_difference": mean,
+                "sample_std": std,
+                "standard_error": se,
+                "ci95_low": low,
+                "ci95_high": high,
+            }
+        )
     return result
 
 
@@ -185,9 +224,7 @@ def plot_all(
                 mean = samples.mean(axis=0)
                 std = samples.std(axis=0, ddof=1)
                 axis.plot(FORMAL_STEPS, mean, style, label=label, color=color)
-                axis.fill_between(
-                    FORMAL_STEPS, mean - std, mean + std, color=color, alpha=0.15
-                )
+                axis.fill_between(FORMAL_STEPS, mean - std, mean + std, color=color, alpha=0.15)
             axis.set_title(f"{model}, {int(fraction * 100)}% data")
             axis.grid(alpha=0.2)
             if model_index == 2:
@@ -201,8 +238,18 @@ def plot_all(
 
     markers = {0.1: "o", 0.3: "s", 1.0: "^"}
     for fraction in (0.1, 0.3, 1.0):
-        selected = sorted((row for row in conditions if float(row["data_fraction"]) == fraction), key=lambda row: int(row["parameter_count"]))
-        plt.errorbar([int(row["parameter_count"]) for row in selected], [row["best_val_loss_mean"] for row in selected], yerr=[row["best_val_loss_sample_std"] for row in selected], marker=markers[fraction], capsize=4, label=f"{int(fraction * 100)}% data")
+        selected = sorted(
+            (row for row in conditions if float(row["data_fraction"]) == fraction),
+            key=lambda row: int(row["parameter_count"]),
+        )
+        plt.errorbar(
+            [int(row["parameter_count"]) for row in selected],
+            [row["best_val_loss_mean"] for row in selected],
+            yerr=[row["best_val_loss_sample_std"] for row in selected],
+            marker=markers[fraction],
+            capsize=4,
+            label=f"{int(fraction * 100)}% data",
+        )
     plt.xscale("log")
     plt.title("Model scale and best validation loss")
     plt.xlabel("Parameter count (log scale)")
@@ -211,8 +258,18 @@ def plot_all(
     save_figure(summary_dir, "model_scale_mean_std")
 
     for model in ("tiny", "small", "medium"):
-        selected = sorted((row for row in conditions if row["model_size"] == model), key=lambda row: int(row["unique_train_windows"]))
-        plt.errorbar([int(row["unique_train_windows"]) for row in selected], [row["best_val_loss_mean"] for row in selected], yerr=[row["best_val_loss_sample_std"] for row in selected], marker="o", capsize=4, label=model)
+        selected = sorted(
+            (row for row in conditions if row["model_size"] == model),
+            key=lambda row: int(row["unique_train_windows"]),
+        )
+        plt.errorbar(
+            [int(row["unique_train_windows"]) for row in selected],
+            [row["best_val_loss_mean"] for row in selected],
+            yerr=[row["best_val_loss_sample_std"] for row in selected],
+            marker="o",
+            capsize=4,
+            label=model,
+        )
     plt.xscale("log")
     plt.title("Data scale and best validation loss")
     plt.xlabel("Unique training windows (log scale)")
@@ -224,7 +281,13 @@ def plot_all(
     for model in ("tiny", "small", "medium"):
         for fraction in (0.1, 0.3, 1.0):
             labels.append(f"{model}\n{int(fraction * 100)}%")
-            distributions.append([int(row["best_step"]) for row in summaries if row["model_size"] == model and float(row["data_fraction"]) == fraction])
+            distributions.append(
+                [
+                    int(row["best_step"])
+                    for row in summaries
+                    if row["model_size"] == model and float(row["data_fraction"]) == fraction
+                ]
+            )
     plt.boxplot(distributions, labels=labels)
     plt.title("Best evaluation step across seeds")
     plt.xlabel("Condition")
@@ -282,7 +345,9 @@ def report(
         "",
         "## 实验设计",
         "",
-        "本实验在不修改原阶段一输出的前提下，将训练扩展为 3 个 seed、3 种模型和 3 种数据规模，共 27 组。每 2,000 steps 完整评测一次；因此 best step 仅具有 2,000-step 的离散分辨率。每组处理 81,920,000 tokens。",
+        "本实验在不修改原阶段一输出的前提下，将训练扩展为 3 个 seed、3 种模型和 "
+        "3 种数据规模，共 27 组。每 2,000 steps 完整评测一次；因此 best step "
+        "仅具有 2,000-step 的离散分辨率。每组处理 81,920,000 tokens。",
         "",
         "GPU 映射固定为 seed 42→物理 GPU 0、seed 43→GPU 1、seed 44→GPU 2；GPU 3 未使用。计时可能受共享服务器负载影响。",
         "",
@@ -292,7 +357,14 @@ def report(
         "|---|---:|---:|---:|---:|",
     ]
     for row in conditions:
-        lines.append(f"| {row['model_size']} | {float(row['data_fraction']):.0%} | {row['best_val_loss_mean']:.6f} ± {row['best_val_loss_sample_std']:.6f} | [{row['best_val_loss_ci95_low']:.6f}, {row['best_val_loss_ci95_high']:.6f}] | {row['best_step_min']}–{row['best_step_max']} |")
+        lines.append(
+            f"| {row['model_size']} | {float(row['data_fraction']):.0%} | "
+            f"{row['best_val_loss_mean']:.6f} ± "
+            f"{row['best_val_loss_sample_std']:.6f} | "
+            f"[{row['best_val_loss_ci95_low']:.6f}, "
+            f"{row['best_val_loss_ci95_high']:.6f}] | "
+            f"{row['best_step_min']}–{row['best_step_max']} |"
+        )
     lines += [
         "",
         "95% CI 使用自由度 2 的 Student t 临界值 4.303。n=3 的区间较宽，不将其解释为高功效显著性检验。",
@@ -341,7 +413,10 @@ def report(
         "",
         f"Git commit：`{commits}`。数据 SHA256：`{dataset_hashes}`。",
         "",
-        "每组保存 resolved config、配置/数据/Git 哈希、Python/NumPy/PyTorch/CUDA seed 环境、物理/逻辑 GPU 映射、AMP 与后端标志。共享服务器会给吞吐和耗时引入噪声；字符级 Tiny Shakespeare、三个 seed 与固定训练预算限制了结论外推。完整 checkpoint 验收结果见 `validation_report.json`。",
+        "每组保存 resolved config、配置/数据/Git 哈希、Python/NumPy/PyTorch/CUDA "
+        "seed 环境、物理/逻辑 GPU 映射、AMP 与后端标志。共享服务器会给吞吐和耗时"
+        "引入噪声；字符级 Tiny Shakespeare、三个 seed 与固定训练预算限制了结论外推。"
+        "完整 checkpoint 验收结果见 `validation_report.json`。",
         "",
     ]
     return "\n".join(lines)
@@ -349,21 +424,39 @@ def report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml"))
+    parser.add_argument(
+        "--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml")
+    )
     parser.add_argument("--output-root", type=Path, default=Path("outputs_multiseed_20k"))
     args = parser.parse_args()
     summaries, metrics = load_runs(args.config, args.output_root)
     conditions = condition_rows(summaries)
     paired = paired_rows(summaries)
     summary_dir = args.output_root / "summary"
-    write_csv(summary_dir / "experiment_summary_27runs.csv", SUMMARY_FIELDS, [{key: row.get(key, "") for key in SUMMARY_FIELDS} for row in summaries])
+    write_csv(
+        summary_dir / "experiment_summary_27runs.csv",
+        SUMMARY_FIELDS,
+        [{key: row.get(key, "") for key in SUMMARY_FIELDS} for row in summaries],
+    )
     condition_fields = list(conditions[0])
     write_csv(summary_dir / "condition_summary.csv", condition_fields, conditions)
     write_csv(summary_dir / "paired_differences.csv", list(paired[0]), paired)
     plot_all(summaries, metrics, conditions, summary_dir)
-    (summary_dir / "STAGE1_MULTISEED_20K_REPORT.md").write_text(report(conditions, paired, summaries), encoding="utf-8", newline="\n")
+    (summary_dir / "STAGE1_MULTISEED_20K_REPORT.md").write_text(
+        report(conditions, paired, summaries), encoding="utf-8", newline="\n"
+    )
     (summary_dir / "failed_runs.json").write_text("[]\n", encoding="utf-8", newline="\n")
-    print(json.dumps({"runs": len(summaries), "conditions": len(conditions), "paired_comparisons": len(paired), "summary_dir": str(summary_dir)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "runs": len(summaries),
+                "conditions": len(conditions),
+                "paired_comparisons": len(paired),
+                "summary_dir": str(summary_dir),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

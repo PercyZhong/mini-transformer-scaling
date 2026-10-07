@@ -48,6 +48,4 @@ def test_checkpoint_restores_step_parameters_and_optimizer(tmp_path: Path) -> No
     for key, value in model.state_dict().items():
         torch.testing.assert_close(value, expected[key])
     assert optimizer.state_dict()["state"]
-    torch.testing.assert_close(
-        val_batches.state_dict()["generator_state"], expected_val_state
-    )
+    torch.testing.assert_close(val_batches.state_dict()["generator_state"], expected_val_state)

@@ -45,8 +45,7 @@ def completed_run_is_valid(run_dir: Path, expected_steps: int) -> bool:
             status.get("state") == "completed"
             and summary.get("status") == "completed"
             and int(status.get("step", -1)) == expected_steps
-            and int(summary.get("tokens_processed", -1))
-            == expected_steps * 32 * 128
+            and int(summary.get("tokens_processed", -1)) == expected_steps * 32 * 128
             and _checkpoint_loadable(run_dir / "checkpoints/best.pt")
             and _checkpoint_loadable(run_dir / "checkpoints/final.pt")
         )
@@ -128,8 +127,19 @@ def worker(args: argparse.Namespace) -> int:
                     )
                 else:
                     error = "completed run failed summary/checkpoint integrity validation"
-                    print(json.dumps({"run_id": run.run_id, "action": "refuse_invalid_completed", "error": error}), flush=True)
-                    failures.append({"run_id": run.run_id, "error_type": "IntegrityError", "error": error})
+                    print(
+                        json.dumps(
+                            {
+                                "run_id": run.run_id,
+                                "action": "refuse_invalid_completed",
+                                "error": error,
+                            }
+                        ),
+                        flush=True,
+                    )
+                    failures.append(
+                        {"run_id": run.run_id, "error_type": "IntegrityError", "error": error}
+                    )
                     run_records.append(
                         {
                             "run_id": run.run_id,
@@ -213,19 +223,32 @@ def smoke_worker_args(args: argparse.Namespace, seed: int, output_root: Path) ->
         sys.executable,
         "-m",
         "mini_transformer.train",
-        "--model-size", "tiny",
-        "--data-fraction", "0.1",
-        "--data", str(args.data),
-        "--output", str(output_root / run_id),
-        "--device", "cuda",
-        "--physical-gpu-id", str(gpu),
-        "--seed", str(seed),
-        "--context-length", "32",
-        "--batch-size", "4",
-        "--max-steps", "2",
-        "--eval-interval", "1",
-        "--eval-batches", "1",
-        "--checkpoint-interval", "1",
+        "--model-size",
+        "tiny",
+        "--data-fraction",
+        "0.1",
+        "--data",
+        str(args.data),
+        "--output",
+        str(output_root / run_id),
+        "--device",
+        "cuda",
+        "--physical-gpu-id",
+        str(gpu),
+        "--seed",
+        str(seed),
+        "--context-length",
+        "32",
+        "--batch-size",
+        "4",
+        "--max-steps",
+        "2",
+        "--eval-interval",
+        "1",
+        "--eval-batches",
+        "1",
+        "--checkpoint-interval",
+        "1",
         "--no-step-one-eval",
         "--no-resume",
     ]
@@ -235,23 +258,33 @@ def launch(args: argparse.Namespace) -> int:
     config = load_experiment_config(args.config)
     runs = expand_runs(config)
     if args.dry_run:
-        print(json.dumps({"count": len(runs), "runs": [run.__dict__ | {"run_id": run.run_id} for run in runs]}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "count": len(runs),
+                    "runs": [run.__dict__ | {"run_id": run.run_id} for run in runs],
+                },
+                indent=2,
+            )
+        )
         return 0
     used = active_compute_gpus()
     conflicts = sorted({0, 1, 2} & used)
     if conflicts:
-        raise RuntimeError(f"refusing to start because required physical GPUs are busy: {conflicts}")
+        raise RuntimeError(
+            f"refusing to start because required physical GPUs are busy: {conflicts}"
+        )
 
     output_root = args.output_root
-    expected_output = Path(
-        "outputs_multiseed_20k_smoke" if args.smoke else config["output_root"]
-    )
+    expected_output = Path("outputs_multiseed_20k_smoke" if args.smoke else config["output_root"])
     if output_root != expected_output:
         raise ValueError(f"output root must be {expected_output} for this mode")
     if args.smoke:
         output_root.mkdir(parents=True, exist_ok=True)
     else:
-        existing_runs = [output_root / run.run_id for run in runs if (output_root / run.run_id).exists()]
+        existing_runs = [
+            output_root / run.run_id for run in runs if (output_root / run.run_id).exists()
+        ]
         if existing_runs and not args.resume:
             raise FileExistsError("formal run directories exist; inspect them and use --resume")
         output_root.mkdir(parents=True, exist_ok=True)
@@ -271,17 +304,37 @@ def launch(args: argparse.Namespace) -> int:
             smoke_worker_args(args, seed, output_root)
             if args.smoke
             else [
-                sys.executable, str(Path(__file__).resolve()), "--worker-seed", str(seed),
-                "--config", str(args.config), "--training", str(args.training),
-                "--data", str(args.data), "--output-root", str(output_root),
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--worker-seed",
+                str(seed),
+                "--config",
+                str(args.config),
+                "--training",
+                str(args.training),
+                "--data",
+                str(args.data),
+                "--output-root",
+                str(output_root),
                 *(["--resume"] if args.resume else []),
             ]
         )
         log_path = logs / f"seed{seed}_gpu{gpu}.log"
         handle = log_path.open("a" if args.resume else "w", encoding="utf-8", newline="\n")
-        process = subprocess.Popen(command, cwd=PROJECT_ROOT, env=env, stdout=handle, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.Popen(
+            command, cwd=PROJECT_ROOT, env=env, stdout=handle, stderr=subprocess.STDOUT, text=True
+        )
         processes.append((seed, gpu, process, handle))
-        records.append({"seed": seed, "physical_gpu_id": gpu, "pid": process.pid, "started_at_utc": utc_now(), "run_ids": [run.run_id for run in runs if run.seed == seed], "log": log_path.as_posix()})
+        records.append(
+            {
+                "seed": seed,
+                "physical_gpu_id": gpu,
+                "pid": process.pid,
+                "started_at_utc": utc_now(),
+                "run_ids": [run.run_id for run in runs if run.seed == seed],
+                "log": log_path.as_posix(),
+            }
+        )
     failed = False
     for seed, _gpu, process, handle in processes:
         returncode = process.wait()
@@ -292,7 +345,12 @@ def launch(args: argparse.Namespace) -> int:
         worker_result = logs / f"seed{seed}_worker_result.json"
         if worker_result.exists():
             record["runs"] = _read_json(worker_result).get("runs", [])
-    manifest = {"created_at_utc": utc_now(), "mode": "smoke" if args.smoke else "formal", "config_hash": stable_hash(config), "workers": records}
+    manifest = {
+        "created_at_utc": utc_now(),
+        "mode": "smoke" if args.smoke else "formal",
+        "config_hash": stable_hash(config),
+        "workers": records,
+    }
     atomic_json(output_root / "scheduler_manifest.json", manifest)
     print(json.dumps({"workers": records, "failed": failed}, indent=2))
     return 1 if failed else 0
@@ -300,7 +358,9 @@ def launch(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml"))
+    parser.add_argument(
+        "--config", type=Path, default=Path("configs/experiment_multiseed_20k.yaml")
+    )
     parser.add_argument("--training", type=Path, default=Path("configs/training.yaml"))
     parser.add_argument("--data", type=Path, default=Path("data/raw/tiny_shakespeare.txt"))
     parser.add_argument("--output-root", type=Path, default=Path("outputs_multiseed_20k"))

@@ -76,7 +76,9 @@ def test_multiseed_statistics_use_sample_std_and_t_interval() -> None:
     assert len(conditions) == 9
     assert all(row["n_seeds"] == 3 for row in conditions)
     assert len(paired) == 18
-    assert all(row["difference_direction"] == "right_minus_left_negative_is_improvement" for row in paired)
+    assert all(
+        row["difference_direction"] == "right_minus_left_negative_is_improvement" for row in paired
+    )
 
 
 @pytest.mark.parametrize("name", ["../escape", "/absolute", "safe/../../escape"])
