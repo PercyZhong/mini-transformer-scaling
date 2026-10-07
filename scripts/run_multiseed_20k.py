@@ -270,9 +270,19 @@ def launch(args: argparse.Namespace) -> int:
         return 0
     used = active_compute_gpus()
     conflicts = sorted({0, 1, 2} & used)
-    if conflicts:
+    if conflicts and not args.allow_busy_required_gpus:
         raise RuntimeError(
             f"refusing to start because required physical GPUs are busy: {conflicts}"
+        )
+    if conflicts:
+        print(
+            json.dumps(
+                {
+                    "warning": "starting with explicitly permitted busy required GPUs",
+                    "busy_required_physical_gpus": conflicts,
+                }
+            ),
+            flush=True,
         )
 
     output_root = args.output_root
@@ -349,6 +359,8 @@ def launch(args: argparse.Namespace) -> int:
         "created_at_utc": utc_now(),
         "mode": "smoke" if args.smoke else "formal",
         "config_hash": stable_hash(config),
+        "busy_required_physical_gpus_at_launch": conflicts,
+        "allow_busy_required_gpus": args.allow_busy_required_gpus,
         "workers": records,
     }
     atomic_json(output_root / "scheduler_manifest.json", manifest)
@@ -367,6 +379,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument(
+        "--allow-busy-required-gpus",
+        action="store_true",
+        help=(
+            "continue only with explicit operator approval when GPU 0, 1, or 2 already "
+            "has a compute process; records the condition in the scheduler manifest"
+        ),
+    )
     parser.add_argument("--worker-seed", type=int, help=argparse.SUPPRESS)
     return parser
 

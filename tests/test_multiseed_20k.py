@@ -1,3 +1,4 @@
+import argparse
 import math
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from mini_transformer.multiseed import (
     load_experiment_config,
 )
 from scripts.package_multiseed_20k import safe_names
+from scripts.run_multiseed_20k import build_parser
 from scripts.summarize_multiseed_20k import condition_rows, paired_rows, stats
 
 
@@ -37,6 +39,15 @@ def test_formal_config_and_evaluation_points_are_exact() -> None:
     assert config["eval_batches"] == 50
     assert config["checkpoint_interval"] == 2000
     assert FORMAL_STEPS == tuple(range(2000, 20001, 2000))
+
+
+def test_shared_gpu_override_is_explicit_and_opt_in() -> None:
+    parser = build_parser()
+    default_args = parser.parse_args([])
+    override_args = parser.parse_args(["--allow-busy-required-gpus"])
+    assert isinstance(default_args, argparse.Namespace)
+    assert default_args.allow_busy_required_gpus is False
+    assert override_args.allow_busy_required_gpus is True
 
 
 def synthetic_summaries() -> list[dict[str, object]]:
